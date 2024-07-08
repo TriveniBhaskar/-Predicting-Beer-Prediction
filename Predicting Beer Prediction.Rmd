@@ -1,0 +1,149 @@
+---
+Subject: OPS-646 - Final Project
+Name: Triveni Bhaskar
+SMC ID: 1026789
+---
+
+
+##importing the dataset called Beer Production
+library(readxl)
+Beer_Production <- read_excel("C:/Users/trive/Downloads/Beer Production.xlsx")
+View(Beer_Production)   
+
+
+##Now checking for Na values if present
+sum(is.na(Beer_Production))
+
+
+##Removing the null values
+Beer_Production <- na.omit(Beer_Production)
+
+
+##Month column -- Time Series Format
+Beer_Production$Date <- as.Date(paste0(Beer_Production$Month, "-01"), format = "%Y-%m-%d")
+
+
+# Converting to Time-Series analysis
+beer_ts = ts(Beer_Production$`Monthly beer production`,start = c(1,1), frequency = 12)
+
+# Visualizing the Data by plot
+plot(beer_ts,xlab="Time", ylab="Monthly Beer Production", main="Beer Production over months")
+
+##Library
+library(ggplot2)
+
+# Checking the structure of your dataset
+str(Beer_Production)
+
+##Now creating the histogram
+ggplot(data = Beer_Production, aes(x = `Monthly beer production`)) +
+  geom_histogram(bins = 30, fill = "blue", color = "black") +
+  labs(title = "Distribution of Monthly Beer Production", x = "Monthly Beer Production", y = "Frequency")
+
+
+# Histogram depicts the distribution of monthly beer production is somewhat skewed to the right.
+## The histogram displays a right-skewed distribution, indicating that the majority of months have lower beer production values, with a tail extending towards higher production values
+
+
+--------------------Simple Moving Averages (SMA)----------------
+
+##installing libraries
+library(TTR)
+library(ggplot2)
+
+
+### Calculate Simple Moving Averages (SMA) for beer production with window sizes of 12, 24, and 36 months
+Beer_Production$SMA_12 = SMA(beer_ts,n = 12)
+Beer_Production$SMA_24 = SMA(beer_ts,n = 24)
+Beer_Production$SMA_36 = SMA(beer_ts,n = 36)
+
+
+### Plot monthly beer production along with Simple Moving Averages (SMA) using ggplot2.
+ggplot(Beer_Production, aes(x = Date)) + 
+  geom_line(aes(y = `Monthly beer production`), colour = "green") +
+  geom_line(aes(y = SMA_12), colour = "blue") +
+  geom_line(aes(y = SMA_24), colour = "red") +
+  geom_line(aes(y = SMA_36), colour = "red")
+  labs(title = "Monthly Beer Production with SMA", x = "Date", y = "Production")
+
+
+###By checcking the graph---Transitioning from Simple Moving Averages (SMA) to ARIMA is advisable given the clear trend observed in the graph.
+
+
+# Checking For Stationarity
+library(tseries)
+adf.test(beer_ts)
+
+##Since the p-value was less than 0.05, indicating the time series stationarity.
+
+# Seasonal Decomposition
+### Perform seasonal decomposition of the beer production time series using a multiplicative model.
+decomposed_beer <- decompose(beer_ts, type="multiplicative")
+### Plot the seasonal decomposition results.
+plot(decomposed_beer)
+
+
+##---Checking on model selection and forecasting
+
+# Load the 'forecast' package which contains the 'auto.arima' function
+library(forecast)
+
+# Define the end index for the training data, representing 96 months.
+train_end <- 96
+
+# Create the training time series by extracting data from the beginning to the specified end index.
+train_ts <- window(beer_ts, start = c(1, 1), end = c(train_end / 12))
+
+# Create the test time series by extracting data after the training period.
+test_ts <- window(beer_ts, start = c((train_end / 12) + 1, 1))
+
+# Fit an ARIMA model (automatically selected) to the training data
+model1 <- auto.arima(train_ts, seasonal = TRUE)
+
+
+##Checking residuals
+checkresiduals(model1)
+
+##--After the checking the residuals, validation of the ARIMA model's adequacy enhances confidence in its forecasts, empowering informed decision-making for optimizing beer production operations.
+
+
+# Generate forecasts for the next 20 time periods using the ARIMA model (model1)
+forecasts <- forecast(model1, h = 20)
+
+# Plot the forecasts
+plot(forecasts)
+
+
+# Calculate the Mean Absolute Error (MAE) between the forecasted and actual values
+MAE <- mean(abs(forecasts$mean - test_ts))
+
+# Print the calculated MAE
+print(paste("Mean Absolute Error (MAE):", MAE))
+
+
+# Plot the Autocorrelation Function (ACF) plot for the beer production time series
+acf(beer_ts, main = "ACF Plot for Beer Production")
+
+# Plot the Partial Autocorrelation Function (PACF) plot for the beer production time series
+pacf(beer_ts, main = "PACF Plot for Beer Production")
+
+
+# Define and fit a new ARIMA model (Model2) with specified parameters (p=1, d=0, q=6) to the training data
+Model2 <- Arima(train_ts, order = c(3, 0, 10))
+
+##I have considered d=0, since p-value is 0.01
+
+
+# Generate forecasts for the next 20 time periods using the ARIMA model (Model2)
+forecasts <- forecast(Model2, h = 20)
+
+# Plot the forecasts
+plot(forecasts)
+
+# Calculate the Mean Absolute Error (MAE) between forecasted and actual values
+MAE <- mean(abs(forecasts$mean - test_ts))
+
+# Print the calculated MAE
+print(paste("Mean Absolute Error (MAE):", MAE))
+
+##Mean Absolute Error = 8.993
